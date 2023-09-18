@@ -48,15 +48,15 @@ def get_frequency(order):
 
 # counts words and sorts them
 def sort_words(order):
-    global occurences
+    global ocurrences
     used_words = {}
     ret = []
 
     for sura_index in order:
         sura = load_data(sura_index)
         for word in sura:
-            if occurences.get(word["word"],False):
-                occurences[word["word"]].append({
+            if ocurrences.get(word["word"],False):
+                ocurrences[word["word"]].append({
                         "sura_index"        :word["sura_index"],
                         "word_index"        :word["word_index"],
                         "ayah_index"        :word["ayah_index"],
@@ -69,7 +69,7 @@ def sort_words(order):
                     "index":len(used_words),
                     "word":word,
                }
-            occurences[word["word"]]=[{
+            ocurrences[word["word"]]=[{
                     "sura_index"        :word["sura_index"],
                     "word_index"        :word["word_index"],
                     "ayah_index"        :word["ayah_index"],
@@ -79,10 +79,10 @@ def sort_words(order):
                 }]
     for word in used_words:
         ret.append(used_words[word])
-    return sorted(ret, key=lambda w:w["index"]) 
+    return sorted(ret, key = lambda w:w["index"]) 
 
 # generates deck set
-def generateDeck(words,name,code):
+def generateDeck(words, name, code):
     global freq
     print("Generating deck...")
     my_model = genanki.Model(
@@ -93,15 +93,59 @@ def generateDeck(words,name,code):
         {'name': 'transliteration'},
         {'name': 'translation'},
         {'name': 'audio'},
-        {'name': 'occurences'},
+        {'name': 'ocurrences'},
+        {'name': 'ocurred'}
         ],
       templates=[
         {
           'name': 'Quran vocab with sound',
           'qfmt': '''<p style="font-size:2em">{{word}}</p>''',
-          'afmt': '{{FrontSide}}<hr>{{audio}}<div style="font-size:1.5em">{{word}} - {{transliteration}} - {{translation}}</div>{{occurences}}',
+          'afmt': '''
+            {{FrontSide}}
+            <hr>
+            {{audio}}
+            <div style="font-size:1.5em">
+                {{word}} - {{transliteration}} - {{translation}}
+            </div>
+            <div> Ocurred: {{ocurred}} times.</div>
+            <div onclick="mark()" id="inputText">
+                <details>
+                    <summary>Ocurrences</summary>
+                    {{ocurrences}}
+                </details>
+            </div>
+            <script>
+                var marked = false;
+                function highlight(text) {
+            var inputText = document.getElementById("inputText");
+            var innerHTML = inputText.innerHTML;
+            var index = innerHTML.indexOf(text);
+
+            while (index >= 0) {
+                innerHTML = innerHTML.substring(0, index) + "<span class='highlight'>" + innerHTML.substring(index, index + text.length) + "</span>" + innerHTML.substring(index + text.length);
+                
+                // Move the index forward to search for the next occurrence
+                index = innerHTML.indexOf(text, index + text.length + 31); // Adding 31 to skip the previously added HTML tags
+            }
+
+            inputText.innerHTML = innerHTML;
+            }
+
+
+                function mark(){
+                    if(!marked){
+                        highlight("{{word}}")
+                        highlight("{{translation}}")
+                    }
+                    marked = true;
+                }
+                //mark()
+            </script>
+            ''',
         },
-      ])
+      ],
+      css=".highlight {color: red;}"
+    )
 
     my_deck = genanki.Deck(
       int(code),
@@ -123,10 +167,10 @@ def generateDeck(words,name,code):
             <p>{o['ayah_translit']}</p>
             <p>{o['ayah_english']}</p>
         </div><br>""", freq[word["word"]["word"]] )))
-        occur_text = f"<details><summary>{occur_text}</summary></details>"
+        ocurred = str(len(freq[word["word"]["word"]]))
         my_note = genanki.Note(
           model=my_model,
-          fields=[word_arabic,translit,english,audio,occur_text]
+          fields=[word_arabic,translit,english,audio,occur_text,ocurred]
           )
         my_deck.add_note(my_note)
     my_package = genanki.Package(my_deck)
@@ -150,16 +194,15 @@ if __name__ == "__main__":
     os.mkdir("decks/standard")
 
     #Generate deck set in standard order(Al-Fatihah, Al-Baqarah ... An-Nas)
-    occurences = {}
+    ocurrences = {}
     freq = get_frequency(reversed(list(range(1,115))))
     for index,sura in enumerate(reversed(list(range(1,115)))):
         words = sort_words([sura])
         generateDeck(words,f"reversed/Quran vocab with audio - reversed - {threeDigit(index+1)}. {sura_names[sura-1]}", 12321)
 
     #Generate deck set in reversed order(An-Nas, Al-Falaq ... up to Al-Fatihah)
-    occurences = {}
+    ocurrences = {}
     freq = get_frequency(list(range(1,115)))
     for index,sura in enumerate(list(range(1,115))):
         words = sort_words([sura])
         generateDeck(words,f"standard/Quran vocab with audio - {threeDigit(index+1)}. {sura_names[sura-1]}", 12322)
-
